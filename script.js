@@ -13,115 +13,188 @@ window.addEventListener('resize', () => {
   canvas.height = window.innerHeight;
 });
 
-// ---- PARTICULES ----
-class Particle {
-  constructor(x, y, color) {
+// ---- DÉBRIS (morceaux solides) ----
+class Debris {
+  constructor(x, y) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 14 + 3;
     this.x = x;
     this.y = y;
-    this.vx = (Math.random() - 0.5) * 18;
-    this.vy = (Math.random() - 0.5) * 18 - Math.random() * 6;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed - Math.random() * 8;
+    this.gravity = 0.45;
+    this.rotation = Math.random() * Math.PI * 2;
+    this.rotationSpeed = (Math.random() - 0.5) * 0.3;
+    this.w = Math.random() * 10 + 3;
+    this.h = Math.random() * 5 + 2;
     this.alpha = 1;
-    this.color = color;
-    this.radius = Math.random() * 6 + 2;
-    this.gravity = 0.35;
-    this.decay = Math.random() * 0.02 + 0.012;
-    this.trail = [];
+    this.decay = Math.random() * 0.008 + 0.005;
+    // couleur : brun, gris, noir brûlé
+    const r = Math.floor(Math.random() * 80 + 30);
+    const g = Math.floor(Math.random() * 50 + 15);
+    const b = Math.floor(Math.random() * 20);
+    this.color = `rgb(${r},${g},${b})`;
   }
   update() {
-    this.trail.push({ x: this.x, y: this.y, alpha: this.alpha });
-    if (this.trail.length > 6) this.trail.shift();
-    this.vx *= 0.97;
+    this.vx *= 0.98;
     this.vy += this.gravity;
     this.x += this.vx;
     this.y += this.vy;
+    this.rotation += this.rotationSpeed;
     this.alpha -= this.decay;
-    this.radius *= 0.98;
   }
   draw() {
-    // traînée
-    for (let i = 0; i < this.trail.length; i++) {
-      const t = this.trail[i];
-      ctx.beginPath();
-      ctx.arc(t.x, t.y, this.radius * (i / this.trail.length) * 0.6, 0, Math.PI * 2);
-      ctx.fillStyle = this.color.replace('1)', `${t.alpha * 0.3})`);
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fillStyle = this.color.replace('1)', `${this.alpha})`);
-    ctx.shadowBlur = 12;
-    ctx.shadowColor = this.color;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+    ctx.fillStyle = this.color;
+    ctx.fillRect(-this.w / 2, -this.h / 2, this.w, this.h);
+    ctx.restore();
   }
 }
 
-class Spark {
+// ---- FUMÉE ----
+class Smoke {
   constructor(x, y) {
-    this.x = x;
-    this.y = y;
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 12 + 4;
-    this.vx = Math.cos(angle) * speed;
-    this.vy = Math.sin(angle) * speed;
-    this.alpha = 1;
-    this.length = Math.random() * 20 + 10;
-    this.decay = Math.random() * 0.03 + 0.02;
-    this.color = `rgba(255, ${Math.floor(Math.random() * 150 + 100)}, 0, 1)`;
+    this.x = x + (Math.random() - 0.5) * 30;
+    this.y = y + (Math.random() - 0.5) * 30;
+    this.vx = (Math.random() - 0.5) * 1.5;
+    this.vy = -(Math.random() * 1.5 + 0.5);
+    this.radius = Math.random() * 20 + 15;
+    this.maxRadius = this.radius * (Math.random() * 3 + 3);
+    this.alpha = Math.random() * 0.4 + 0.2;
+    this.decay = Math.random() * 0.004 + 0.002;
+    const g = Math.floor(Math.random() * 40 + 20);
+    this.color = `rgb(${g},${g},${g})`;
   }
   update() {
     this.x += this.vx;
     this.y += this.vy;
+    this.vx *= 0.99;
+    this.radius = Math.min(this.radius + 1.2, this.maxRadius);
+    this.alpha -= this.decay;
+  }
+  draw() {
+    const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+    grad.addColorStop(0, this.color.replace(')', `, ${this.alpha})`).replace('rgb', 'rgba'));
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+}
+
+// ---- BOULES DE FEU ----
+class Fireball {
+  constructor(x, y) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 10 + 2;
+    this.x = x;
+    this.y = y;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed - Math.random() * 4;
+    this.gravity = 0.18;
+    this.radius = Math.random() * 18 + 8;
+    this.alpha = 1;
+    this.decay = Math.random() * 0.025 + 0.015;
+    // feu : orange → rouge → noir
+    this.hue = Math.random() * 30 + 5; // 5–35 (orange/rouge)
+  }
+  update() {
     this.vx *= 0.95;
-    this.vy *= 0.95;
-    this.vy += 0.2;
+    this.vy += this.gravity;
+    this.x += this.vx;
+    this.y += this.vy;
+    this.radius *= 0.97;
+    this.alpha -= this.decay;
+    this.hue = Math.max(0, this.hue - 0.5);
+  }
+  draw() {
+    const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+    grad.addColorStop(0,   `hsla(60, 100%, 90%, ${this.alpha})`);   // blanc chaud au centre
+    grad.addColorStop(0.2, `hsla(${this.hue + 20}, 100%, 70%, ${this.alpha})`); // jaune
+    grad.addColorStop(0.6, `hsla(${this.hue}, 100%, 45%, ${this.alpha * 0.8})`); // orange/rouge
+    grad.addColorStop(1,   `hsla(0, 0%, 5%, 0)`);                   // bord sombre
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+}
+
+// ---- ÉCLATS (sparks courts) ----
+class Spark {
+  constructor(x, y) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 20 + 8;
+    this.x = x;
+    this.y = y;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed - Math.random() * 5;
+    this.gravity = 0.4;
+    this.alpha = 1;
+    this.decay = Math.random() * 0.04 + 0.025;
+    this.color = Math.random() > 0.5
+      ? `rgba(255, ${Math.floor(Math.random() * 120 + 80)}, 0, 1)`
+      : `rgba(255, 240, 180, 1)`;
+  }
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vx *= 0.93;
+    this.vy += this.gravity;
     this.alpha -= this.decay;
   }
   draw() {
     ctx.beginPath();
     ctx.moveTo(this.x, this.y);
-    ctx.lineTo(this.x - this.vx * 3, this.y - this.vy * 3);
+    ctx.lineTo(this.x - this.vx * 2.5, this.y - this.vy * 2.5);
     ctx.strokeStyle = this.color.replace('1)', `${this.alpha})`);
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.lineCap = 'round';
     ctx.stroke();
   }
 }
 
-let particles = [];
+let fireballs = [];
+let smokes = [];
+let debris = [];
 let sparks = [];
+let shockwaves = [];
 
 function explode(x, y, intensity = 1) {
-  const colors = [
-    'rgba(255, 80, 0, 1)',
-    'rgba(255, 200, 0, 1)',
-    'rgba(255, 50, 50, 1)',
-    'rgba(255, 160, 0, 1)',
-    'rgba(255, 255, 100, 1)',
-    'rgba(200, 50, 0, 1)',
-  ];
-
-  // flash de lumière
+  // 1. flash blanc/orange brutal
   const flash = document.createElement('div');
   flash.className = 'explosion-flash';
   document.body.appendChild(flash);
-  setTimeout(() => flash.remove(), 300);
+  setTimeout(() => flash.remove(), 250);
 
-  // cercle d'onde de choc
-  const shockwave = { x, y, r: 0, maxR: 120 * intensity, alpha: 0.8 };
-  shockwaves.push(shockwave);
+  // 2. onde de choc (double anneau)
+  shockwaves.push({ x, y, r: 0, alpha: 0.9, speed: 14, color: '255,200,80' });
+  shockwaves.push({ x, y, r: 0, alpha: 0.5, speed: 7,  color: '180,100,30' });
 
-  const count = Math.floor(60 * intensity);
-  for (let i = 0; i < count; i++) {
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    particles.push(new Particle(x, y, color));
-  }
-  for (let i = 0; i < 30 * intensity; i++) {
-    sparks.push(new Spark(x, y));
-  }
+  // 3. boules de feu
+  const fbCount = Math.floor(30 * intensity);
+  for (let i = 0; i < fbCount; i++) fireballs.push(new Fireball(x, y));
+
+  // 4. fumée (beaucoup, elle persiste)
+  const smCount = Math.floor(25 * intensity);
+  for (let i = 0; i < smCount; i++) smokes.push(new Smoke(x, y));
+  // fumée supplémentaire après un léger délai
+  setTimeout(() => {
+    for (let i = 0; i < Math.floor(15 * intensity); i++) smokes.push(new Smoke(x, y));
+  }, 120);
+
+  // 5. débris
+  const dbCount = Math.floor(40 * intensity);
+  for (let i = 0; i < dbCount; i++) debris.push(new Debris(x, y));
+
+  // 6. éclats
+  const spCount = Math.floor(20 * intensity);
+  for (let i = 0; i < spCount; i++) sparks.push(new Spark(x, y));
 }
-
-let shockwaves = [];
 
 function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -129,19 +202,24 @@ function animate() {
   // shockwaves
   shockwaves = shockwaves.filter(s => s.alpha > 0);
   shockwaves.forEach(s => {
-    s.r += 8;
+    s.r += s.speed;
     s.alpha -= 0.04;
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255, 150, 0, ${s.alpha})`;
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(${s.color}, ${s.alpha})`;
+    ctx.lineWidth = s.speed > 10 ? 4 : 2;
     ctx.stroke();
   });
 
-  particles = particles.filter(p => p.alpha > 0);
-  sparks = sparks.filter(s => s.alpha > 0);
+  // ordre de rendu : débris → feu → fumée (par-dessus) → éclats
+  debris  = debris.filter(d => d.alpha > 0);
+  fireballs = fireballs.filter(f => f.alpha > 0);
+  smokes  = smokes.filter(s => s.alpha > 0);
+  sparks  = sparks.filter(s => s.alpha > 0);
 
-  particles.forEach(p => { p.update(); p.draw(); });
+  debris.forEach(d => { d.update(); d.draw(); });
+  fireballs.forEach(f => { f.update(); f.draw(); });
+  smokes.forEach(s => { s.update(); s.draw(); });
   sparks.forEach(s => { s.update(); s.draw(); });
 
   requestAnimationFrame(animate);
@@ -164,7 +242,6 @@ attachExplosions();
 // explosion sur le Zidane flottant
 document.getElementById('zidaneFloat').addEventListener('click', function (e) {
   explode(e.clientX, e.clientY, 2);
-  // petit message
   const msg = document.createElement('div');
   msg.textContent = 'ZIDANE 💥';
   msg.style.cssText = `
@@ -184,7 +261,6 @@ document.getElementById('zidaneFloat').addEventListener('click', function (e) {
   setTimeout(() => msg.remove(), 1200);
 });
 
-// Ajouter le style de l'animation de message
 const styleEl = document.createElement('style');
 styleEl.textContent = `
   @keyframes floatMsg {
@@ -198,9 +274,9 @@ document.head.appendChild(styleEl);
 window.addEventListener('load', () => {
   setTimeout(() => {
     explode(window.innerWidth / 2, window.innerHeight / 2, 2.5);
-    setTimeout(() => explode(window.innerWidth * 0.2, window.innerHeight * 0.3, 1.2), 200);
-    setTimeout(() => explode(window.innerWidth * 0.8, window.innerHeight * 0.4, 1.2), 350);
-    setTimeout(() => explode(window.innerWidth * 0.5, window.innerHeight * 0.7, 1.0), 500);
+    setTimeout(() => explode(window.innerWidth * 0.2, window.innerHeight * 0.3, 1.5), 250);
+    setTimeout(() => explode(window.innerWidth * 0.8, window.innerHeight * 0.4, 1.5), 450);
+    setTimeout(() => explode(window.innerWidth * 0.5, window.innerHeight * 0.75, 1.2), 650);
   }, 800);
 });
 
@@ -210,10 +286,8 @@ const sectionObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting && entry.target.id !== lastSection) {
       lastSection = entry.target.id;
-      const rect = entry.target.getBoundingClientRect();
-      // explosion discrète sur le côté au changement de section
       setTimeout(() => {
-        explode(Math.random() * window.innerWidth, window.innerHeight * 0.5, 0.8);
+        explode(Math.random() * window.innerWidth, window.innerHeight * 0.5, 0.9);
       }, 100);
     }
   });
@@ -223,16 +297,13 @@ document.querySelectorAll('section').forEach(s => sectionObserver.observe(s));
 
 // ---- NAVBAR SCROLL ----
 window.addEventListener('scroll', () => {
-  const navbar = document.getElementById('navbar');
-  navbar.classList.toggle('scrolled', window.scrollY > 60);
+  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 60);
 });
 
 // ---- REVEAL AU SCROLL ----
 const revealObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      entry.target.classList.add('visible');
-    }
+    if (entry.isIntersecting) entry.target.classList.add('visible');
   });
 }, { threshold: 0.15 });
 
@@ -244,17 +315,11 @@ document.querySelectorAll('.compagnie-text, .membre-card, .zidane-card, .spectac
 // ---- FORMULAIRE ----
 document.getElementById('contactForm').addEventListener('submit', function (e) {
   e.preventDefault();
-  // explosion de célébration
   for (let i = 0; i < 5; i++) {
     setTimeout(() => {
-      explode(
-        Math.random() * window.innerWidth,
-        Math.random() * window.innerHeight,
-        1.2
-      );
-    }, i * 150);
+      explode(Math.random() * window.innerWidth, Math.random() * window.innerHeight, 1.2);
+    }, i * 180);
   }
-  // feedback utilisateur
   const btn = this.querySelector('.btn-submit');
   btn.textContent = 'Message envoyé ! Zidane est informé. 💥';
   btn.disabled = true;
@@ -265,18 +330,17 @@ document.getElementById('contactForm').addEventListener('submit', function (e) {
   }, 4000);
 });
 
-// ---- EASTER EGG : KONAMI CODE = ZIDANE MASSIF ----
+// ---- EASTER EGG : KONAMI CODE ----
 let konamiSequence = [];
 const konamiCode = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
 document.addEventListener('keydown', (e) => {
   konamiSequence.push(e.key);
   konamiSequence = konamiSequence.slice(-10);
   if (konamiSequence.join(',') === konamiCode.join(',')) {
-    // MÉGA EXPLOSION ZIDANE
     for (let i = 0; i < 20; i++) {
       setTimeout(() => {
-        explode(Math.random() * window.innerWidth, Math.random() * window.innerHeight, 2);
-      }, i * 80);
+        explode(Math.random() * window.innerWidth, Math.random() * window.innerHeight, 2.5);
+      }, i * 100);
     }
     alert('⚽ ZIDANE MODE ACTIVÉ ⚽\nMerci d\'avoir trouvé le code secret de la Cie Clouks.');
   }
